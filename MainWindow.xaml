@@ -13,7 +13,7 @@
             <TextBox
                 VerticalAlignment="Center"
                 x:Name="txtUrlInvite"
-                Text=""
+                Text="https://play.matchdaymanager.football/2dNQo78dF2YGSBiAA"
                 Margin="0 0 10 0"
                 Width="300"
             ></TextBox>
@@ -37,11 +37,11 @@
 
         <StackPanel Orientation="Horizontal" Margin="0 0 0 10">
             <TextBox VerticalAlignment="Center" Width="200" x:Name="device1" Text="device main" Margin="0 0 10 0"></TextBox>
-            <Button Name="btnDevice1" Click="btnDevice1_Click" Margin="0 0 10 0" Width="70">Send Invite</Button>
+            <Button Name="btnDevice1" Click="btnDevice1_Click" Margin="0 0 10 0" Width="70">Get Coint</Button>
             <Button IsEnabled="False" Name="btnDeviceStop1" Click="btnDeviceStop1_Click" Width="50" Margin="0 0 10 0">Stop</Button>
 
             <Label Content="Times to reset: "></Label>
-            <TextBox Width="40" Name="txtTimeToReset" Padding="5 0 5 0" Text="30" Margin="0 0 10 0" Foreground="Red" VerticalContentAlignment="Center"></TextBox>
+            <TextBox Width="40" Name="txtTimeToReset" Padding="5 0 5 0" Text="300" Margin="0 0 10 0" Foreground="Red" VerticalContentAlignment="Center"></TextBox>
         </StackPanel>
 
         <StackPanel Orientation="Horizontal" Margin="0 0 0 10">
@@ -64,7 +64,7 @@
             <Label Name="lbCountDevice3" Content="0" Width="40"></Label>
         </StackPanel>
 
-        <RichTextBox IsReadOnly="True" FontFamily="Consolas" Name="txtLog" Height="500"
+        <RichTextBox FontFamily="Consolas" FontSize="12" Name="txtLog" Height="500"
                      VerticalScrollBarVisibility="Visible"></RichTextBox>
     </StackPanel>
 </Window>

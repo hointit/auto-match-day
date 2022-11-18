@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using KAutoHelper;
 using System.Threading;
 using System.Drawing;
+using System.Security.Permissions;
 
 namespace MatchDay.Helper
 {
@@ -22,29 +23,47 @@ namespace MatchDay.Helper
 
         private static string gamePackageName = "com.playsportgames.football";
 
-        private static bool isGameActivity (string deviceId)
+        public static bool isGameActivity (string deviceId)
         {
-            string cmd = string.Format(cmdGetCurrentWindow, deviceId);
-            string result = KAutoHelper.ADBHelper.ExecuteCMD(deviceId);
+            string result = KAutoHelper.ADBHelper.ExecuteCMD(string.Format(cmdGetCurrentWindow, deviceId));
             return result.Contains(gamePackageName);
         }
 
 
         public static bool isMainScreenGame (string deviceId)
         {
-            ADBHelper.SetADBFolderPath("D:\\Program Files\\Nox\\bin");
-            string a  = ADBHelper.ExecuteCMD(string.Format(cmdSreenCap, deviceId));
-            string b = ADBHelper.ExecuteCMD(string.Format(cmdPullFile, deviceId));
-            var screen = new Bitmap(tempPath + "/screenshot.png");
-
-            var ad = ADBHelper.ScreenShoot(deviceId);
+            ADBHelper.SetADBFolderPath(MainWindow.ADB_FOLDER_PATH);
+            string fileName = deviceId.Substring(deviceId.Length -4, 4);
+            var screen = ADBHelper.ScreenShoot(deviceId, true, $"homeCheck{deviceId}.png");
 
             var homeCheck = new Bitmap("Images/home-check.png");
 
-            var hasPostion = KAutoHelper.ImageScanOpenCV.FindOutPoint(ad, homeCheck);
+            var hasPostion = ImageScanOpenCV.FindOutPoint(screen, homeCheck);
 
             return hasPostion != null;
         }
 
+        public static Point? GetPostionStartNewGame (string deviceId)
+        {
+            ADBHelper.SetADBFolderPath(MainWindow.ADB_FOLDER_PATH);
+            string fileName = deviceId.Substring(deviceId.Length - 4, 4);
+            var screen = ADBHelper.ScreenShoot(deviceId, true, $"startNewGame{fileName}.png");
+
+            var startNewGame = new Bitmap("Images/start-new-game.png");
+
+            return ImageScanOpenCV.FindOutPoint(screen, startNewGame);
+        }
+
+        public static bool CheckStep (string deviceId, string step)
+        {
+            ADBHelper.SetADBFolderPath(MainWindow.ADB_FOLDER_PATH);
+            string fileName = deviceId.Substring(deviceId.Length - 4, 4);
+            var screen = ADBHelper.ScreenShoot(deviceId, true, $"step{step}-{fileName}.png");
+
+            var stepImage = new Bitmap($"Images/{step}.png");
+            var hasPostion = ImageScanOpenCV.FindOutPoint(screen, stepImage);
+
+            return hasPostion != null;
+        }
     }
 }

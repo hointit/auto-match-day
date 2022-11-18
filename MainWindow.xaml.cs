@@ -34,8 +34,10 @@ namespace MatchDay
         private Thread thread3;
 
         private int countDevice2 = 0;
+        private int countTotalDevice2 = 0;
         private bool readyToRestartDevice2 = false;
         private int countDevice3 = 0;
+        private int countTotalDevice3 = 0;
         private bool readyToRestartDevice3 = false;
 
         private string deviceId2 = "";
@@ -49,6 +51,7 @@ namespace MatchDay
         private string cmdOpenGame =
                     "adb -s {0} shell \"am start -n com.playsportgames.football/com.google.firebase.MessagingUnityPlayerActivity\"";
         private string cmdKillGame = "adb -s {0} shell \"am force-stop com.playsportgames.football\"";
+        private string cmdKillBrowser = "adb -s {0} shell \"am force-stop com.android.browser\"";
 
         private string cmdGetCurrentWindow = "adb -s {0} shell \"dumpsys window windows | grep -E 'mCurrentFocus'\"";
 
@@ -60,6 +63,10 @@ namespace MatchDay
 
         private int totalCoinEarn = 0;
 
+        public static string ADB_FOLDER_PATH = "";
+
+        private int MAX_TRY = 10;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -67,7 +74,7 @@ namespace MatchDay
 
         private void Button_Click(object sender, RoutedEventArgs e)
         {
-            string ADB_FOLDER_PATH = this.txtPathToADB.Text;
+            ADB_FOLDER_PATH = this.txtPathToADB.Text;
             ADBHelper.SetADBFolderPath(ADB_FOLDER_PATH);
             var devices = KAutoHelper.ADBHelper.GetDevices();
 
@@ -89,121 +96,283 @@ namespace MatchDay
 
         private void AutoResetGame (string deviceId)
         {
+            if (!CheckScreenHelper.isGameActivity(deviceId))
+            {
+                ADBHelper.ExecuteCMD(String.Format(this.cmdOpenGame,deviceId));
+                Thread.Sleep(2000);
+            }
 
-            // Mở context menu
-            ADBHelper.TapByPercent(deviceId, 88.0, 4.0);
+            for (int i = 0; i < MAX_TRY; i++)
+            {
+                if (CheckScreenHelper.isMainScreenGame(deviceId))
+                {
+                    ADBHelper.TapByPercent(deviceId, 88.0, 4.0);
+                    Thread.Sleep(1500);
+                    break;
+                }
+                else
+                {
+                    WriteLog($"[{deviceId}]Waiting for load main screen game: count = {i + 1}");
+                    Thread.Sleep(5000);
+                }
+            }
 
-            Thread.Sleep(2000);
-
-            // Click nút Setting
+            // Click Setting
             ADBHelper.TapByPercent(deviceId, 37.7, 16.8);
 
-            Thread.Sleep(2000);
+            Thread.Sleep(1500);
 
-            // Kéo xuống tìm nút reset data
-            ADBHelper.SwipeByPercent(deviceId, 50, 80, 50, 20);
-            Thread.Sleep(2000);
-            ADBHelper.SwipeByPercent(deviceId, 50, 80, 50, 20);
-            // ngưng kéo
+            // scroll down and find the but ton start new game
+            ADBHelper.SwipeByPercent(deviceId, 50, 80, 50, 10);
+            Thread.Sleep(1000);
+            // stop scroll
 
-            Thread.Sleep(3000);
-
-            // Click nút reset data
-            ADBHelper.TapByPercent(deviceId, 50, 28);
-            WriteLog("Reset game data device: " + deviceId);
+            for (int i = 0; i < MAX_TRY; i ++)
+            {
+                var startNewGamePositon = CheckScreenHelper.GetPostionStartNewGame(deviceId);
+                if (startNewGamePositon != null)
+                {
+                    ADBHelper.Tap(deviceId, startNewGamePositon.Value.X, startNewGamePositon.Value.Y);
+                    Thread.Sleep(1500);
+                    break;
+                }
+                else
+                {
+                    WriteLog($"[{deviceId}]Can't find the button start new game: count = {i + 1}");
+                    if (i == MAX_TRY - 1)
+                    {
+                        SetStopThread(deviceId);
+                    }
+                    Thread.Sleep(1000);
+                }
+            }
 
             Thread.Sleep(1000);
-            // Click nút xác nhận
+            // Click confirm clear data
             ADBHelper.TapByPercent(deviceId, 70, 65);
 
-            // Chờ reset data và load màn hình game
-            Thread.Sleep(15000);
-
-            // Tab to continute
-            ADBHelper.TapByPercent(deviceId, 50, 95);
-
-            Thread.Sleep(3000);
-            // Tab to continute (xác nhận tên club)
-            ADBHelper.TapByPercent(deviceId, 50, 95);
-
-            Thread.Sleep(2000);
-            // Tab to continute (xác nhận tên club lần 2)
-            ADBHelper.TapByPercent(deviceId, 50, 95);
-
-            Thread.Sleep(2000);
-            // Tab to continute (xác nhận áo)
-            ADBHelper.TapByPercent(deviceId, 50, 92);
-
-            Thread.Sleep(2000);
-            // Tab to continute (xác nhận quang cảnh xung quanh)
-            ADBHelper.TapByPercent(deviceId, 50, 95);
-
-            Thread.Sleep(2000);
-            // Tab to continute (xác nhận location)
-            ADBHelper.TapByPercent(deviceId, 50, 92);
-
-            // Chờ tới màn hình tin tức
+            // waiting for reset data
             Thread.Sleep(10000);
-            // Tab to continute (xác nhận màn hình tin tức)
-            ADBHelper.TapByPercent(deviceId, 50, 95);
 
-            ADBHelper.ScreenShoot(deviceId);
+            // check step1. screen load new game
+            for (int i = 0; i < MAX_TRY; i++)
+            {
+                if (CheckScreenHelper.CheckStep(deviceId, "step1"))
+                {
+                    // Tab to continute
+                    ADBHelper.TapByPercent(deviceId, 50, 95);
+                    Thread.Sleep(2000);
+                    break;
+                }
+                else
+                {
+                    WriteLog($"[{deviceId}] Waiting for load new game: count = {i + 1}");
+                    if (i == MAX_TRY - 1)
+                    {
+                        SetStopThread(deviceId);
+                    }
+                    Thread.Sleep(4000);
+                }
+                
+            }
 
-            // chờ load màn hình chính của game
-            Thread.Sleep(3000);
+            // step 2: Tab to continute. confirm kit
+            for (int i = 0; i < MAX_TRY; i++)
+            {
+                if (CheckScreenHelper.CheckStep(deviceId, "step2"))
+                {
+                    // Tab to continute
+                    ADBHelper.TapByPercent(deviceId, 50, 95);
+                    Thread.Sleep(1500);
+                    break;
+                }
+                else
+                {
+                    WriteLog($"[{deviceId}] Waiting for confirm kit 1st: count = {i + 1}");
+                    if (i == MAX_TRY - 1)
+                    {
+                        SetStopThread(deviceId);
+                    }
+                    Thread.Sleep(1000);
+                }
+            }
+
+            // step 3:  Tab to continute. confirm kit again
+            for (int i = 0; i < MAX_TRY; i++)
+            {
+                if (CheckScreenHelper.CheckStep(deviceId, "step3"))
+                {
+                    // Tab to continute
+                    ADBHelper.TapByPercent(deviceId, 50, 95);
+                    Thread.Sleep(1500);
+                    break;
+                }
+                else
+                {
+                    WriteLog($"[{deviceId}] Waiting for confirm kit 2nd: count = {i + 1}");
+                    if (i == MAX_TRY - 1)
+                    {
+                        SetStopThread(deviceId);
+                    }
+                    Thread.Sleep(1000);
+                }
+            }
+
+            // step 4: Confirm kit (final confirm kit and club's name)
+            for (int i = 0; i < MAX_TRY; i++)
+            {
+                if (CheckScreenHelper.CheckStep(deviceId, "step4"))
+                {
+                    // Tab to continute
+                    ADBHelper.TapByPercent(deviceId, 50, 92);
+                    Thread.Sleep(1500);
+                    break;
+                }
+                else
+                {
+                    WriteLog($"[{deviceId}] Waiting for final confirm kit and club's name: count = {i + 1}");
+                    if (i == MAX_TRY - 1)
+                    {
+                        SetStopThread(deviceId);
+                    }
+                    Thread.Sleep(1000);
+                }
+            }
+
+            // step 5: Tab to continute. confirm stadium plans
+            for (int i = 0; i < MAX_TRY; i++)
+            {
+                if (CheckScreenHelper.CheckStep(deviceId, "step5"))
+                {
+                    // Tab to continute
+                    ADBHelper.TapByPercent(deviceId, 50, 95);
+                    Thread.Sleep(1500);
+                    break;
+                }
+                else
+                {
+                    WriteLog($"[{deviceId}] Waiting for confirm stadium plans: count = {i + 1}");
+                    if (i == MAX_TRY - 1)
+                    {
+                        SetStopThread(deviceId);
+                    }
+                    Thread.Sleep(1000);
+                }
+            }
+
+            // step 6: confirm location
+            for (int i = 0; i < MAX_TRY; i++)
+            {
+                if (CheckScreenHelper.CheckStep(deviceId, "step6"))
+                {
+                    // Tab to continute
+                    ADBHelper.TapByPercent(deviceId, 50, 92);
+
+                    // waiting for load screen NEWS
+                    Thread.Sleep(10000);
+                    break;
+                }
+                else
+                {
+                    WriteLog($"[{deviceId}] Waiting for confirm stadium plans: count = {i + 1}");
+                    if (i == MAX_TRY - 1)
+                    {
+                        SetStopThread(deviceId);
+                    }
+                    Thread.Sleep(1000);
+                }
+            }
+
+            // step 7: Continute screen NEWS, go to main screen
+            for (int i = 0; i < MAX_TRY; i++)
+            {
+                if (CheckScreenHelper.CheckStep(deviceId, "step7"))
+                {
+                    // Tab to continute (xác nhận màn hình tin tức)
+                    ADBHelper.TapByPercent(deviceId, 50, 95);
+                    Thread.Sleep(2000);
+                    break;
+                }
+                else
+                {
+                    WriteLog($"[{deviceId}] Waiting for confirm stadium plans: count = {i + 1}");
+                    if (i == MAX_TRY - 1)
+                    {
+                        SetStopThread(deviceId);
+                    }
+                    Thread.Sleep(3000);
+                }
+            }
 
             while(true)
             {
-                //if (hasComingCoin)
-                //{
-                //    var remainingTime = (DateTime.Now - this.lastComingCoin).TotalSeconds;
-                //    var seconds = Convert.ToInt32(remainingTime);
-                //    WriteLog($"[{deviceId}] There are some coins that have not been received, please wait: {seconds}s");
-                //    Thread.Sleep(40000 - (seconds * 1000));
-                //}
-                //else
-                //{
-                //    ADBHelper.ExecuteCMD(string.Format(cmdOpenBrowser, deviceId, this.urlInvite));
-                //    Thread.Sleep(3000);
-                //    this.lastComingCoin = DateTime.Now;
-                //    this.hasComingCoin = true;
-                //    break;
-                //}
+                if (hasComingCoin)
+                {
 
-                ADBHelper.ExecuteCMD(string.Format(cmdOpenBrowser, deviceId, this.urlInvite));
-                Thread.Sleep(3000);
-                this.lastComingCoin = DateTime.Now;
-                this.hasComingCoin = true;
-                break;
+                    var remainingTime = (DateTime.Now - this.lastComingCoin).TotalSeconds;
+                    var seconds = Convert.ToInt32(remainingTime);
+                    var timeToSleep = 15000 - (seconds * 1000);
+                    if (timeToSleep <= 0)
+                    {
+                        timeToSleep = 15000;
+                    }
+                    WriteLog($"[{deviceId}] There are some coins that have not been received, please wait: {timeToSleep/1000}s");
+                    Thread.Sleep(timeToSleep);
+                }
+                else
+                {
+                    ADBHelper.ExecuteCMD(string.Format(cmdOpenBrowser, deviceId, this.urlInvite));
+                    Thread.Sleep(3000);
+                    this.lastComingCoin = DateTime.Now;
+                    this.hasComingCoin = true;
+                    break;
+                }
             }
             DispatcherAction(() => updateCount(deviceId)) ;
+        }
+
+        private void SetStopThread(string deviceId)
+        {
+            for (int i  = 0; i < MAX_TRY; i ++)
+            {
+                ADBHelper.TapByPercent(deviceId, 50, 95);
+                Thread.Sleep(2000);
+            }
+            
+            if (deviceId == this.deviceId2)
+            {
+                this.readyToRestartDevice2 = true;
+                DispatcherAction(StopAutoDevice2);
+                return;
+            }
+
+            if (deviceId == this.deviceId3)
+            {
+                this.readyToRestartDevice3 = true;
+                DispatcherAction(StopAutoDevice3);
+                return;
+            }
         }
 
         private void AutoReciveCoin (string deviceId)
         {
             ADBHelper.TapByPercent(deviceId, 50, 86);
 
-            Thread.Sleep(5000);
+            Thread.Sleep(3000);
             
             var isChooserActivity = ADBHelper.ExecuteCMD(string.Format(this.cmdGetCurrentWindow, deviceId));
 
             if(isChooserActivity.Contains("com.android.internal.app.ChooserActivity"))
             {
                 // Click bluetooth
-                ADBHelper.TapByPercent(deviceId, 15, 74);
-                Thread.Sleep(3000);
+                ADBHelper.TapByPercent(deviceId, 24, 90);
+                Thread.Sleep(2000);
             }
 
-            // check current window
-            var bluetooth = ADBHelper.ExecuteCMD(string.Format(this.cmdGetCurrentWindow, deviceId));
-            if (bluetooth.Contains("com.android.bluetooth.opp.BluetoothOppBtEnableActivity"))
-            {
-                ADBHelper.Key(deviceId, KAutoHelper.ADBKeyEvent.KEYCODE_BACK);
-            }
-            
+            ADBHelper.ExecuteCMD(String.Format(this.cmdOpenGame, deviceId));
 
             // Click nhận tiền
-            Thread.Sleep(5000);
+            Thread.Sleep(4000);
             ADBHelper.TapByPercent(deviceId, 50, 80);
 
             totalCoinEarn += 15;
@@ -352,8 +521,13 @@ namespace MatchDay
             this.btnDevice2.IsEnabled = true;
             this.btnDeviceStop2.IsEnabled = false;
             this.device2.IsEnabled = true;
-            thread2.Abort();
-            thread2 = null;
+            if (thread2 != null)
+            {
+                thread2.Abort();
+                thread2.Interrupt();
+                thread2 = null;
+            }
+            
         }
 
         private void btnDeviceStop3_Click(object sender, RoutedEventArgs e)
@@ -463,10 +637,10 @@ namespace MatchDay
             WriteLog("Start game device: " + deviceId);
             ADBHelper.ExecuteCMD(string.Format(cmdOpenGame, deviceId));
 
-            WriteLog(deviceId + "  Waiting to ready (about 2 min)....");
+            WriteLog(deviceId + "  Waiting to ready (about 1 min)....");
 
-            // nghỉ 2 phút sau khi mở app
-            Thread.Sleep(120000);
+            // nghỉ 1 phút sau khi mở app
+            Thread.Sleep(60000);
 
             WriteLog("Ready Device: " + deviceId);
         }
@@ -487,14 +661,16 @@ namespace MatchDay
             if (deviceId == this.deviceId2)
             {
                 this.countDevice2++;
-                this.lbCountDevice2.Content = this.countDevice2;
+                this.countTotalDevice2++;
+                this.lbCountDevice2.Content = $"{this.countDevice2}/{this.countTotalDevice2}";
                 return;
             }
 
             if (deviceId == this.deviceId3)
             {
                 this.countDevice3++;
-                this.lbCountDevice3.Content = this.countDevice3;
+                this.countTotalDevice3++;
+                this.lbCountDevice3.Content = $"{this.countDevice3}/{this.countTotalDevice3}";
                 return;
             }
 
@@ -502,9 +678,8 @@ namespace MatchDay
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            this.lbCountDevice2.Content = 0;
-
-            this.lbCountDevice3.Content = 0;
+            this.lbCountDevice2.Content = "0/0";
+            this.lbCountDevice3.Content = "0/0";
         }
 
         private void DispatcherAction(Action action)
@@ -527,6 +702,11 @@ namespace MatchDay
                 this.btnConfirmUrl.Content = "Confirm Url";
             }
            
+        }
+
+        private void btnTestFeature_Click(object sender, RoutedEventArgs e)
+        {
+            var a = CheckScreenHelper.GetPostionStartNewGame("emulator-5554");
         }
     }
 }
